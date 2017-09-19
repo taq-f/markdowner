@@ -3,6 +3,9 @@ package style
 func Get() string {
 	return `
 <style>
+/*! Color themes for Google Code Prettify | MIT License | github.com/jmblog/color-themes-for-google-code-prettify */
+/* pre{background:#fff;font-family:Menlo,Bitstream Vera Sans Mono,DejaVu Sans Mono,Monaco,Consolas,monospace;border:0!important} */ .pln{color:#333}ol.linenums{margin-top:0;margin-bottom:0;color:#ccc}li.L0,li.L1,li.L2,li.L3,li.L4,li.L5,li.L6,li.L7,li.L8,li.L9{padding-left:1em;background-color:#fff;list-style-type:decimal}@media screen{.str{color:#183691}.kwd{color:#a71d5d}.com{color:#969896}.typ{color:#0086b3}.lit{color:#0086b3}.pun{color:#333}.opn{color:#333}.clo{color:#333}.tag{color:navy}.atn{color:#795da3}.atv{color:#183691}.dec{color:#333}.var{color:teal}.fun{color:#900}}
+
 body {
 	color: rgba(0,0,0,.87);
 	font-family: "Segoe WPC", "Segoe UI", "SFUIText-Light", "HelveticaNeue-Light", sans-serif, "Droid Sans Fallback";
@@ -71,14 +74,20 @@ pre {
 	overflow-x: auto;
 	white-space: pre-wrap;
 	overflow-wrap: break-word;
+
+	padding: 16px;
+	border-radius: 3px;
+	overflow: auto;
 }
 
+/*
 pre:not(.hljs),
 pre.hljs code > div {
 	padding: 16px;
 	border-radius: 3px;
 	overflow: auto;
 }
+*/
 
 hr {
 	border: 0;
@@ -123,11 +132,13 @@ body > p, table, blockquote, pre {
 	margin-right: 10px;
 }
 
+/*
 :not(pre):not(.hljs) > code {
 	color: #A31515;
 	font-size: inherit;
 	font-family: inherit;
 }
+*/
 
 li {
 	padding-top: 5px;
