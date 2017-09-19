@@ -69,7 +69,7 @@ func render(template string, style string, input string, outDir string, baseDir 
 	}
 
 	markdowned := string(blackfriday.MarkdownCommon(data))
-	markdowned = highlightCode(markdowned)
+	markdowned = highlightCode(markdowned, filepath.Dir(input))
 
 	output := template
 	output = strings.Replace(output, "{{{content}}}", markdowned, -1)
@@ -94,7 +94,8 @@ func render(template string, style string, input string, outDir string, baseDir 
 	return nil
 }
 
-func highlightCode(html string) string {
+func highlightCode(html string, inputPath string) string {
+
 	reader := strings.NewReader(html)
 	doc, _ := goquery.NewDocumentFromReader(reader)
 
@@ -106,6 +107,17 @@ func highlightCode(html string) string {
 		}
 		s.SetHtml(string(formatted))
 	})
+
+	// 画像をbase64で含める場合
+	// doc.Find("img").Each(func(i int, s *goquery.Selection) {
+	// 	src, _ := s.Attr("src")
+	// 	path := filepath.Join(inputPath, src)
+	// 	mime := mime.TypeByExtension(filepath.Ext(path))
+	// 	base64, _ := imageToBase64(path)
+	// 	srcEnced := fmt.Sprintf("data:%s;base64,%s", mime, base64)
+
+	// 	s.SetAttr("src", srcEnced)
+	// })
 
 	new, _ := doc.Html()
 
