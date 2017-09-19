@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"mime"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,7 +16,26 @@ import (
 	"github.com/sourcegraph/syntaxhighlight"
 )
 
-func Render(template string, style string, input string, outDir string, baseDir string) error {
+// Markdown renderer
+type Renderer struct {
+	// whether image file being base64 encoded and included in html
+	ImageInline bool
+
+	// html template
+	Template string
+
+	// css style to be included in html
+	Style string
+
+	// base directory where markdown files are located
+	BaseDir string
+
+	// output directory
+	OutDir string
+}
+
+// Convert markdown to html and write it to file
+func (r *Renderer) Render(input string) error {
 	data, err := ioutil.ReadFile(input)
 	if err != nil {
 		fmt.Println("ERROR IN READING FILE", err)
@@ -23,13 +43,25 @@ func Render(template string, style string, input string, outDir string, baseDir 
 	}
 
 	markdowned := string(blackfriday.MarkdownCommon(data))
-	markdowned = highlightCode(markdowned, filepath.Dir(input))
 
-	output := template
+	//
+	reader := strings.NewReader(markdowned)
+	doc, _ := goquery.NewDocumentFromReader(reader)
+
+	highlightCode(doc)
+	if r.ImageInline {
+		packImage(doc, r.BaseDir)
+	}
+
+	markdowned, _ = doc.Html()
+	markdowned = strings.Replace(markdowned, "<html><head></head><body>", "", 1)
+	markdowned = strings.Replace(markdowned, "</body></html>", "", 1)
+
+	output := r.Template
+	output = strings.Replace(output, "{{{style}}}", r.Style, -1)
 	output = strings.Replace(output, "{{{content}}}", markdowned, -1)
-	output = strings.Replace(output, "{{{style}}}", style, -1)
 
-	out, err := getOutPath(input, outDir, baseDir)
+	out, err := outPath(input, r.OutDir, r.BaseDir)
 
 	if err != nil {
 		return err
@@ -48,11 +80,7 @@ func Render(template string, style string, input string, outDir string, baseDir 
 	return nil
 }
 
-func highlightCode(html string, inputPath string) string {
-
-	reader := strings.NewReader(html)
-	doc, _ := goquery.NewDocumentFromReader(reader)
-
+func highlightCode(doc *goquery.Document) {
 	doc.Find("code[class*=\"language-\"]").Each(func(i int, s *goquery.Selection) {
 		oldCode := s.Text()
 		formatted, err := syntaxhighlight.AsHTML([]byte(oldCode))
@@ -61,44 +89,38 @@ func highlightCode(html string, inputPath string) string {
 		}
 		s.SetHtml(string(formatted))
 	})
-
-	// 画像をbase64で含める場合
-	// doc.Find("img").Each(func(i int, s *goquery.Selection) {
-	// 	src, _ := s.Attr("src")
-	// 	path := filepath.Join(inputPath, src)
-	// 	mime := mime.TypeByExtension(filepath.Ext(path))
-	// 	base64, _ := imageToBase64(path)
-	// 	srcEnced := fmt.Sprintf("data:%s;base64,%s", mime, base64)
-
-	// 	s.SetAttr("src", srcEnced)
-	// })
-
-	new, _ := doc.Html()
-
-	new = strings.Replace(new, "<html><head></head><body>", "", 1)
-	new = strings.Replace(new, "</body></html>", "", 1)
-
-	return new
 }
 
-func getOutPath(input string, specified string, baseDir string) (string, error) {
-	if specified == "" {
-		// same directory as input
-		extension := filepath.Ext(input)
-		fileBasename := input[:utf8.RuneCountInString(input)-utf8.RuneCountInString(extension)]
-		newFilename := fileBasename + ".html"
+func packImage(doc *goquery.Document, baseDir string) {
+	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		src, _ := s.Attr("src")
+		if !strings.HasPrefix(src, "http") {
+			path := filepath.Join(baseDir, src)
+			mime := mime.TypeByExtension(filepath.Ext(path))
+			base64, _ := imageToBase64(path)
+			srcEnced := fmt.Sprintf("data:%s;base64,%s", mime, base64)
+			s.SetAttr("src", srcEnced)
+		}
+	})
+}
 
-		return newFilename, nil
-	}
-
+func outPath(input string, specified string, baseDir string) (string, error) {
 	out := filepath.Join(specified, input[utf8.RuneCountInString(baseDir):])
-	extension := filepath.Ext(out)
-	fileBasename := out[:utf8.RuneCountInString(out)-utf8.RuneCountInString(extension)]
-	out = fileBasename + ".html"
-
-	return out, nil
+	return changeExtension(out, "html"), nil
 }
 
+// change extension
+func changeExtension(path string, toExt string) string {
+	return omitExtension(path) + "." + toExt
+}
+
+// drop extension from path
+func omitExtension(path string) string {
+	extension := filepath.Ext(path)
+	return path[:utf8.RuneCountInString(path)-utf8.RuneCountInString(extension)]
+}
+
+// base64 encoding of image file
 func imageToBase64(path string) (string, error) {
 	imageFile, err := os.Open(path)
 	if err != nil {
