@@ -105,6 +105,7 @@ func main() {
 	log.Printf("SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
 
 	if *argWatch {
+		log.Println("start watching...")
 		watch(input, &r)
 	}
 }
@@ -127,7 +128,7 @@ func watch(root string, renderer *renderer.Renderer) {
 				switch {
 				case event.Op&fsnotify.Write == fsnotify.Write:
 					if isTargetFile(path) {
-						log.Println("detect change (file)", path)
+						log.Println("modification detected:", path)
 						renderer.Render(path)
 					}
 				case event.Op&fsnotify.Create == fsnotify.Create:
@@ -139,14 +140,18 @@ func watch(root string, renderer *renderer.Renderer) {
 						watcher.Add(path)
 					}
 				case event.Op&fsnotify.Remove == fsnotify.Remove:
-					// TODO
+					if isDir(path) {
+						watcher.Remove(path)
+					}
 				case event.Op&fsnotify.Rename == fsnotify.Rename:
-					// TODO
+					if isDir(path) {
+						watcher.Remove(path)
+					}
 				case event.Op&fsnotify.Chmod == fsnotify.Chmod:
 					// TODO
 				}
 			case err := <-watcher.Errors:
-				log.Println("error: ", err)
+				log.Println("watch error: ", err)
 				done <- true
 			}
 		}
