@@ -1,6 +1,7 @@
 package renderer
 
 import (
+	"bytes"
 	"encoding/base64"
 	"fmt"
 	"io/ioutil"
@@ -16,52 +17,50 @@ import (
 	"github.com/sourcegraph/syntaxhighlight"
 )
 
-// Markdown renderer
+// Renderer support conversion from markdown file into html file
 type Renderer struct {
 	// whether image file being base64 encoded and included in html
 	ImageInline bool
-
 	// html template
 	Template string
-
 	// css style to be included in html
 	Style string
-
 	// base directory where markdown files are located
 	BaseDir string
-
 	// output directory
 	OutDir string
 }
 
-// Convert markdown to html and write it to file
-func (r *Renderer) Render(input string) error {
-	data, err := ioutil.ReadFile(input)
+// Render converts markdown to html and write it to file
+func (r *Renderer) Render(path string) error {
+	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		fmt.Println("ERROR IN READING FILE", err)
 		return err
 	}
 
-	markdowned := string(blackfriday.MarkdownCommon(data))
+	markdowned := blackfriday.MarkdownCommon(data)
 
-	//
-	reader := strings.NewReader(markdowned)
-	doc, _ := goquery.NewDocumentFromReader(reader)
+	// we need document reader to modify markdowned html text, for example,
+	// syntax highlight.
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(markdowned))
+	if err != nil {
+		return err
+	}
 
 	highlightCode(doc)
 	if r.ImageInline {
 		packImage(doc, r.BaseDir)
 	}
 
-	markdowned, _ = doc.Html()
-	markdowned = strings.Replace(markdowned, "<html><head></head><body>", "", 1)
-	markdowned = strings.Replace(markdowned, "</body></html>", "", 1)
+	content, _ := doc.Html()
+	content = strings.Replace(content, "<html><head></head><body>", "", 1)
+	content = strings.Replace(content, "</body></html>", "", 1)
 
 	output := r.Template
 	output = strings.Replace(output, "{{{style}}}", r.Style, -1)
-	output = strings.Replace(output, "{{{content}}}", markdowned, -1)
+	output = strings.Replace(output, "{{{content}}}", content, -1)
 
-	out, err := outPath(input, r.OutDir, r.BaseDir)
+	out, err := outPath(path, r.OutDir, r.BaseDir)
 
 	if err != nil {
 		return err
@@ -80,6 +79,7 @@ func (r *Renderer) Render(input string) error {
 	return nil
 }
 
+// highlight inside of code tag
 func highlightCode(doc *goquery.Document) {
 	doc.Find("code[class*=\"language-\"]").Each(func(i int, s *goquery.Selection) {
 		oldCode := s.Text()
@@ -91,6 +91,7 @@ func highlightCode(doc *goquery.Document) {
 	})
 }
 
+// include image to html document
 func packImage(doc *goquery.Document, baseDir string) {
 	doc.Find("img").Each(func(i int, s *goquery.Selection) {
 		src, _ := s.Attr("src")
@@ -104,8 +105,9 @@ func packImage(doc *goquery.Document, baseDir string) {
 	})
 }
 
-func outPath(input string, specified string, baseDir string) (string, error) {
-	out := filepath.Join(specified, input[utf8.RuneCountInString(baseDir):])
+// get output file name
+func outPath(input string, outDir string, baseDir string) (string, error) {
+	out := filepath.Join(outDir, input[utf8.RuneCountInString(baseDir):])
 	return changeExtension(out, "html"), nil
 }
 

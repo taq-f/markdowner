@@ -25,7 +25,7 @@ func main() {
 	if *argInputFile == "" {
 		input, _ = filepath.Abs(filepath.Dir(os.Args[0]))
 	} else {
-		input = *argInputFile
+		input = cleanPath(*argInputFile)
 	}
 
 	// base directory of input
@@ -33,13 +33,7 @@ func main() {
 	if *argInputFile == "" {
 		baseDir = input
 	} else {
-		dir, err := isDir(input)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		if dir {
+		if isDir(input) {
 			baseDir = input
 		} else {
 			baseDir = filepath.Dir(input)
@@ -50,20 +44,13 @@ func main() {
 	// if not specified, same as input directory
 	var outDir string
 	if *argOutDir == "" {
-		// outDir = filepath.Dir(input)
-		dir, err := isDir(input)
-		if err != nil {
-			fmt.Println(err)
-			return
-		}
-
-		if dir {
+		if isDir(input) {
 			outDir = input
 		} else {
 			outDir = filepath.Dir(input)
 		}
 	} else {
-		outDir = *argOutDir
+		outDir = cleanPath(*argOutDir)
 	}
 
 	r := renderer.Renderer{
@@ -98,17 +85,12 @@ func main() {
 // if the path is a file, return only that file.
 // if the path is a directory, return all markdown files under it (recursively).
 func getTargetFiles(path string) ([]string, error) {
-	directory, err := isDir(path)
-	if err != nil {
-		return nil, err
-	}
-
-	if !directory {
+	if !isDir(path) {
 		return []string{path}, nil
 	}
 
-	p := filepath.Join(path, "**", "*.md")
-	files, err := zglob.Glob(p)
+	globStr := filepath.Join(path, "**", "*.md")
+	files, err := zglob.Glob(globStr)
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +98,19 @@ func getTargetFiles(path string) ([]string, error) {
 	return files, nil
 }
 
-// see if specified path is a directory or file
-func isDir(path string) (bool, error) {
+// see if specified path is a directory or file.
+// be careful the path exists and can be read, since this function won't
+// return any errors.
+func isDir(path string) bool {
 	f, err := os.Stat(path)
 	if err != nil {
-		return false, err
+		return false
 	}
 
 	mode := f.Mode()
-	return mode.IsDir(), nil
+	return mode.IsDir()
+}
+
+func cleanPath(path string) string {
+	return filepath.Join(path)
 }
