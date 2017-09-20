@@ -3,10 +3,12 @@ package main
 import (
 	"flag"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
 
+	"github.com/go-fsnotify/fsnotify"
 	zglob "github.com/mattn/go-zglob"
 	"github.com/taq-f/markdowner/renderer"
 	"github.com/taq-f/markdowner/style"
@@ -17,6 +19,7 @@ func main() {
 	argInputFile := flag.String("f", "", "")
 	argOutDir := flag.String("o", "", "")
 	argImageInline := flag.Bool("i", false, "")
+	argWatch := flag.Bool("w", false, "")
 	flag.Parse()
 
 	// input file / directory
@@ -79,6 +82,63 @@ func main() {
 		}(f)
 	}
 	wait.Wait()
+
+	if *argWatch {
+		watch(input, &r)
+	}
+}
+
+func watch(root string, renderer *renderer.Renderer) {
+	watcher, err := fsnotify.NewWatcher()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer watcher.Close()
+
+	done := make(chan bool)
+
+	go func() {
+		for {
+			select {
+			case event := <-watcher.Events:
+				path := event.Name
+				switch {
+				case event.Op&fsnotify.Write == fsnotify.Write:
+					// log.Println("Modified file: ", event.Name)
+					if isTargetFile(path) {
+						log.Println("detect change (file)", path)
+						renderer.Render(path)
+					}
+				case event.Op&fsnotify.Create == fsnotify.Create:
+					if isTargetFile(path) {
+						log.Println("new file detected:", path)
+						renderer.Render(path)
+					} else if isDir(path) {
+						log.Println("new directory detected:", path)
+						watcher.Add(path)
+					}
+				case event.Op&fsnotify.Remove == fsnotify.Remove:
+					// TODO
+				case event.Op&fsnotify.Rename == fsnotify.Rename:
+					// TODO
+				case event.Op&fsnotify.Chmod == fsnotify.Chmod:
+					// TODO
+				}
+			case err := <-watcher.Errors:
+				log.Println("error: ", err)
+				done <- true
+			}
+		}
+	}()
+
+	for _, p := range getDirectories(root) {
+		err = watcher.Add(p)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	<-done
 }
 
 // collect markdown files from the path specified.
@@ -98,6 +158,20 @@ func getTargetFiles(path string) ([]string, error) {
 	return files, nil
 }
 
+// get directories under root specified (recursively)
+func getDirectories(root string) []string {
+	var directories = []string{}
+
+	filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			directories = append(directories, path)
+		}
+		return nil
+	})
+
+	return directories
+}
+
 // see if specified path is a directory or file.
 // be careful the path exists and can be read, since this function won't
 // return any errors.
@@ -111,6 +185,15 @@ func isDir(path string) bool {
 	return mode.IsDir()
 }
 
+// cleanse path string, for example, "some/path/" -> "some/path"
 func cleanPath(path string) string {
 	return filepath.Join(path)
+}
+
+// see if specified path is markdown file
+func isTargetFile(path string) bool {
+	if isDir(path) {
+		return false
+	}
+	return filepath.Ext(path) == ".md"
 }
