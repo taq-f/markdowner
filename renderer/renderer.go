@@ -82,7 +82,7 @@ func (r *Renderer) highlightCode(doc *goquery.Document) {
 		oldCode := s.Text()
 		formatted, err := syntaxhighlight.AsHTML([]byte(oldCode))
 		if err != nil {
-			log.Fatal(err)
+			log.Println("failed to syntax highlight", err)
 			return
 		}
 		s.SetHtml(string(formatted))
@@ -117,12 +117,12 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 			toPath := filepath.Join(r.OutDir, dirPath[utf8.RuneCountInString(r.BaseDir):], src)
 			err := os.MkdirAll(filepath.Dir(toPath), os.ModeDir)
 			if err != nil {
-				log.Fatal(err)
+				log.Println("failed to create a directory for assets", err)
 				return
 			}
 			err = copyFile(fromPath, toPath)
 			if err != nil {
-				log.Fatal(err)
+				log.Println("failed to copy assets", err)
 				return
 			}
 		})

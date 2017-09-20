@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -65,8 +64,7 @@ func main() {
 
 	files, err := getTargetFiles(input)
 	if err != nil {
-		fmt.Println("error", err)
-		return
+		log.Fatalln()
 	}
 
 	wait := new(sync.WaitGroup)
@@ -76,7 +74,7 @@ func main() {
 		go func(file string) {
 			err = r.Render(file)
 			if err != nil {
-				fmt.Println(err)
+				log.Println(err)
 			}
 			wait.Done()
 		}(f)
@@ -88,6 +86,7 @@ func main() {
 	}
 }
 
+// watch file modifications and call appropriate renderer actions
 func watch(root string, renderer *renderer.Renderer) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
