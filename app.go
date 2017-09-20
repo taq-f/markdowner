@@ -21,13 +21,17 @@ func main() {
 	argWatch := flag.Bool("w", false, "")
 	flag.Parse()
 
+	log.Println("preparing...")
+
 	// input file / directory
 	// if not specified, current directory
 	var input string
 	if *argInputFile == "" {
 		input, _ = filepath.Abs(filepath.Dir(os.Args[0]))
+		log.Println("input file/directory not specified. current directory will be input directory:", input)
 	} else {
-		input = cleanPath(*argInputFile)
+		input = cleanPathStr(*argInputFile)
+		log.Println("input file/directory set:", input)
 	}
 
 	// base directory of input
@@ -51,8 +55,17 @@ func main() {
 		} else {
 			outDir = filepath.Dir(input)
 		}
+		log.Println("output directory is not speficied. same as input:", outDir)
 	} else {
-		outDir = cleanPath(*argOutDir)
+		outDir = cleanPathStr(*argOutDir)
+
+		log.Println("output directory:", outDir)
+		log.Println("cleaning output directory")
+		err := os.RemoveAll(outDir)
+		if err != nil {
+			log.Fatalln("failed to clear output directory")
+		}
+		log.Println("cleaning successfully completed")
 	}
 
 	r := renderer.Renderer{
@@ -64,22 +77,32 @@ func main() {
 
 	files, err := getTargetFiles(input)
 	if err != nil {
-		log.Fatalln()
+		log.Fatalln("failed to find target files:", err)
 	}
+
+	log.Println("initialization completed")
+	log.Printf("%d files detected", len(files))
 
 	wait := new(sync.WaitGroup)
 	wait.Add(len(files))
 
+	var failed []string
+
 	for _, f := range files {
 		go func(file string) {
 			err = r.Render(file)
-			if err != nil {
-				log.Println(err)
+			if err == nil {
+				log.Printf("done: %s", file)
+			} else {
+				log.Printf("fail: %s: %s", file, err)
+				failed = append(failed, file)
 			}
 			wait.Done()
 		}(f)
 	}
 	wait.Wait()
+
+	log.Printf("SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
 
 	if *argWatch {
 		watch(input, &r)
@@ -103,7 +126,6 @@ func watch(root string, renderer *renderer.Renderer) {
 				path := event.Name
 				switch {
 				case event.Op&fsnotify.Write == fsnotify.Write:
-					// log.Println("Modified file: ", event.Name)
 					if isTargetFile(path) {
 						log.Println("detect change (file)", path)
 						renderer.Render(path)
@@ -185,7 +207,7 @@ func isDir(path string) bool {
 }
 
 // cleanse path string, for example, "some/path/" -> "some/path"
-func cleanPath(path string) string {
+func cleanPathStr(path string) string {
 	return filepath.Join(path)
 }
 
