@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,6 +22,7 @@ func main() {
 	argOutDir := flag.String("o", "", "")
 	argImageInline := flag.Bool("i", false, "")
 	argWatch := flag.Bool("w", false, "")
+	argCustomStyle := flag.String("s", "", "")
 	flag.Parse()
 
 	log.Println("preparing...")
@@ -70,10 +72,13 @@ func main() {
 		log.Println("cleaning successfully completed")
 	}
 
+	// custom styles
+	customStyles := strings.Split(*argCustomStyle, " ")
+
 	r := renderer.Renderer{
 		ImageInline: *argImageInline,
 		Template:    template.Get(),
-		Style:       style.Get(),
+		Style:       style.Get(&customStyles),
 		OutDir:      outDir,
 		BaseDir:     baseDir}
 
