@@ -167,7 +167,7 @@ func Get(custom *[]string) string {
 	for _, path := range *custom {
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
-			log.Println("WARNING: style sheet read error: ", err)
+			log.Println("WARN : style sheet read error: ", err)
 			continue
 		}
 
