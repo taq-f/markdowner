@@ -11,7 +11,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
 	"github.com/pkg/errors"
@@ -112,7 +111,7 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 			}
 
 			fromPath := filepath.Join(dirPath, src)
-			toPath := filepath.Join(r.OutDir, dirPath[utf8.RuneCountInString(r.BaseDir):], src)
+			toPath := filepath.Join(r.OutDir, dirPath[len(r.BaseDir):], src)
 			err := os.MkdirAll(filepath.Dir(toPath), os.ModeDir)
 			if err != nil {
 				log.Println("WARN : failed to create a directory for assets", err)
@@ -129,19 +128,19 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 
 // get output file name
 func outPath(input string, outDir string, baseDir string) string {
-	out := filepath.Join(outDir, input[utf8.RuneCountInString(baseDir):])
+	out := filepath.Join(outDir, input[len(baseDir):])
 	return changeExtension(out, "html")
 }
 
 // change extension
 func changeExtension(path string, toExt string) string {
-	return omitExtension(path) + "." + toExt
+	return dropExtension(path) + "." + toExt
 }
 
 // drop extension from path
-func omitExtension(path string) string {
+func dropExtension(path string) string {
 	extension := filepath.Ext(path)
-	return path[:utf8.RuneCountInString(path)-utf8.RuneCountInString(extension)]
+	return path[:len(path)-len(extension)]
 }
 
 // base64 encoding of image file
