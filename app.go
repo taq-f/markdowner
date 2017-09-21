@@ -22,6 +22,7 @@ func main() {
 	argOutDir := flag.String("o", "", "")
 	argImageInline := flag.Bool("i", false, "")
 	argWatch := flag.Bool("w", false, "")
+	argCustomTemplate := flag.String("t", "", "")
 	argCustomStyle := flag.String("s", "", "")
 	flag.Parse()
 
@@ -73,11 +74,19 @@ func main() {
 	}
 
 	// custom styles
-	customStyles := strings.Split(*argCustomStyle, " ")
+	customTemplate := *argCustomTemplate
+
+	// custom styles
+	var customStyles []string
+	if *argCustomStyle == "" {
+		customStyles = []string{}
+	} else {
+		customStyles = strings.Split(*argCustomStyle, " ")
+	}
 
 	r := renderer.Renderer{
 		ImageInline: *argImageInline,
-		Template:    template.Get(),
+		Template:    template.Get(customTemplate),
 		Style:       style.Get(&customStyles),
 		OutDir:      outDir,
 		BaseDir:     baseDir}

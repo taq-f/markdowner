@@ -1,7 +1,11 @@
 package template
 
-func Get() string {
-	return `<!DOCTYPE html>
+import (
+	"io/ioutil"
+	"log"
+)
+
+var defaultTemplate = `<!DOCTYPE html>
 <html>
 <head>
 <meta http-equiv="Content-type" content="text/html;charset=UTF-8">
@@ -12,4 +16,18 @@ func Get() string {
 </body>
 </html>
 `
+
+// Get html template string
+func Get(custom string) string {
+	if custom == "" {
+		return defaultTemplate
+	}
+
+	content, err := ioutil.ReadFile(custom)
+	if err != nil {
+		log.Println("WARNING: failed to read template:", err)
+		return ""
+	}
+
+	return string(content)
 }
