@@ -41,10 +41,7 @@ func (r *Renderer) Render(path string) error {
 
 	markdowned := blackfriday.MarkdownCommon(data)
 
-	outPath, err := outPath(path, r.OutDir, r.BaseDir)
-	if err != nil {
-		return err
-	}
+	outPath := outPath(path, r.OutDir, r.BaseDir)
 
 	err = os.MkdirAll(filepath.Dir(outPath), os.ModeDir)
 	if err != nil {
@@ -130,9 +127,9 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 }
 
 // get output file name
-func outPath(input string, outDir string, baseDir string) (string, error) {
+func outPath(input string, outDir string, baseDir string) string {
 	out := filepath.Join(outDir, input[utf8.RuneCountInString(baseDir):])
-	return changeExtension(out, "html"), nil
+	return changeExtension(out, "html")
 }
 
 // change extension
