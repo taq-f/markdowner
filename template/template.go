@@ -25,7 +25,7 @@ func Get(custom string) string {
 
 	content, err := ioutil.ReadFile(custom)
 	if err != nil {
-		log.Println("WARNING: failed to read template:", err)
+		log.Println("WARN : failed to read template:", err)
 		return ""
 	}
 

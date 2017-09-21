@@ -26,17 +26,17 @@ func main() {
 	argCustomStyle := flag.String("s", "", "custom stylesheet path")
 	flag.Parse()
 
-	log.Println("preparing...")
+	log.Println("INFO : preparing...")
 
 	// input file / directory
 	// if not specified, current directory
 	var input string
 	if *argInputFile == "" {
 		input, _ = filepath.Abs(filepath.Dir(os.Args[0]))
-		log.Println("input file/directory not specified. current directory will be input directory:", input)
+		log.Println("INFO : input file/directory not specified. current directory will be input directory:", input)
 	} else {
 		input = cleanPathStr(*argInputFile)
-		log.Println("input file/directory set:", input)
+		log.Println("INFO : input file/directory set:", input)
 	}
 
 	// base directory of input
@@ -60,17 +60,17 @@ func main() {
 		} else {
 			outDir = filepath.Dir(input)
 		}
-		log.Println("output directory is not speficied. same as input:", outDir)
+		log.Println("INFO : output directory is not speficied. same as input:", outDir)
 	} else {
 		outDir = cleanPathStr(*argOutDir)
 
-		log.Println("output directory:", outDir)
-		log.Println("cleaning output directory")
+		log.Println("INFO : output directory:", outDir)
+		log.Println("INFO : cleaning output directory")
 		err := os.RemoveAll(outDir)
 		if err != nil {
-			log.Fatalln("failed to clear output directory")
+			log.Fatalln("ERROR: failed to clear output directory")
 		}
-		log.Println("cleaning successfully completed")
+		log.Println("INFO : cleaning successfully completed")
 	}
 
 	// custom styles
@@ -93,11 +93,11 @@ func main() {
 
 	files, err := getTargetFiles(input)
 	if err != nil {
-		log.Fatalln("failed to find target files:", err)
+		log.Fatalln("ERROR: failed to find target files:", err)
 	}
 
-	log.Println("initialization completed")
-	log.Printf("%d files detected", len(files))
+	log.Println("INFO : initialization completed")
+	log.Printf("INFO : %d files detected", len(files))
 
 	wait := new(sync.WaitGroup)
 	wait.Add(len(files))
@@ -108,9 +108,9 @@ func main() {
 		go func(file string) {
 			err = r.Render(file)
 			if err == nil {
-				log.Printf("done: %s", file)
+				log.Printf("INFO : done: %s", file)
 			} else {
-				log.Printf("fail: %s: %s", file, err)
+				log.Printf("INFO : fail: %s: %s", file, err)
 				failed = append(failed, file)
 			}
 			wait.Done()
@@ -118,10 +118,10 @@ func main() {
 	}
 	wait.Wait()
 
-	log.Printf("SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
+	log.Printf("INFO : SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
 
 	if *argWatch {
-		log.Println("start watching...")
+		log.Println("INFO : start watching...")
 		watch(input, &r)
 	}
 }
@@ -164,16 +164,16 @@ func watch(root string, renderer *renderer.Renderer) {
 						}
 
 						if doRender {
-							log.Println("modification detected:", path)
+							log.Println("INFO : modification detected:", path)
 							renderer.Render(path)
 						}
 					}
 				case event.Op&fsnotify.Create == fsnotify.Create:
 					if isTargetFile(path) {
-						log.Println("new file detected:", path)
+						log.Println("INFO : new file detected:", path)
 						renderer.Render(path)
 					} else if isDir(path) {
-						log.Println("new directory detected:", path)
+						log.Println("INFO : new directory detected:", path)
 						watcher.Add(path)
 					}
 				case event.Op&fsnotify.Remove == fsnotify.Remove:
@@ -188,7 +188,7 @@ func watch(root string, renderer *renderer.Renderer) {
 					// TODO
 				}
 			case err := <-watcher.Errors:
-				log.Println("watch error: ", err)
+				log.Println("ERROR: watch error: ", err)
 				done <- true
 			}
 		}
