@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/go-fsnotify/fsnotify"
 	zglob "github.com/mattn/go-zglob"
@@ -121,6 +122,11 @@ func watch(root string, renderer *renderer.Renderer) {
 	done := make(chan bool)
 
 	go func() {
+		// when a file is modified (saved), "Write" occurs multiple times in
+		// a very short time. to detect a event is originated from the same
+		// operation, record time of events on the same file.
+		modTimeTable := map[string]int64{}
+
 		for {
 			select {
 			case event := <-watcher.Events:
@@ -128,8 +134,24 @@ func watch(root string, renderer *renderer.Renderer) {
 				switch {
 				case event.Op&fsnotify.Write == fsnotify.Write:
 					if isTargetFile(path) {
-						log.Println("modification detected:", path)
-						renderer.Render(path)
+						now := time.Now().UnixNano()
+						t, exists := modTimeTable[path]
+						var doRender bool
+						if exists {
+							span := now - t
+							if span > (200 * 1000 * 1000) {
+								doRender = true
+								modTimeTable[path] = now
+							}
+						} else {
+							modTimeTable[path] = now
+							doRender = true
+						}
+
+						if doRender {
+							log.Println("modification detected:", path)
+							renderer.Render(path)
+						}
 					}
 				case event.Op&fsnotify.Create == fsnotify.Create:
 					if isTargetFile(path) {
