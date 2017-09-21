@@ -2,7 +2,9 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,6 +14,7 @@ import (
 	"github.com/go-fsnotify/fsnotify"
 	zglob "github.com/mattn/go-zglob"
 	"github.com/pkg/errors"
+	"github.com/taq-f/markdowner/chat"
 	"github.com/taq-f/markdowner/renderer"
 	"github.com/taq-f/markdowner/style"
 	"github.com/taq-f/markdowner/template"
@@ -106,7 +109,7 @@ func main() {
 
 	for _, f := range files {
 		go func(file string) {
-			err = r.Render(file)
+			_, err = r.Render(file)
 			if err == nil {
 				log.Printf("INFO : done: %s", file)
 			} else {
@@ -128,6 +131,16 @@ func main() {
 
 // watch file modifications and call appropriate renderer actions
 func watch(root string, renderer *renderer.Renderer) {
+
+	// prepare http server to serve
+	server := chat.NewServer()
+	go server.Listen()
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprintln(w, chat.HTML)
+	})
+	http.Handle("/data/", http.StripPrefix("/data/", http.FileServer(http.Dir(root))))
+
+	// then start watching files
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
 		log.Fatal(err)
@@ -165,7 +178,9 @@ func watch(root string, renderer *renderer.Renderer) {
 
 						if doRender {
 							log.Println("INFO : modification detected:", path)
-							renderer.Render(path)
+							outPath, _ := renderer.Render(path)
+							urlPath := filepath.ToSlash(outPath[len(root):])
+							server.SendAll(&chat.Message{Path: urlPath})
 						}
 					}
 				case event.Op&fsnotify.Create == fsnotify.Create:
@@ -200,6 +215,8 @@ func watch(root string, renderer *renderer.Renderer) {
 			log.Fatal(err)
 		}
 	}
+
+	log.Fatal(http.ListenAndServe(":8080", nil))
 
 	<-done
 }
