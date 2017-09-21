@@ -18,12 +18,12 @@ import (
 )
 
 func main() {
-	argInputFile := flag.String("f", "", "")
-	argOutDir := flag.String("o", "", "")
-	argImageInline := flag.Bool("i", false, "")
-	argWatch := flag.Bool("w", false, "")
-	argCustomTemplate := flag.String("t", "", "")
-	argCustomStyle := flag.String("s", "", "")
+	argInputFile := flag.String("f", "", "input file/directory. if directory is specified, all markdown files under the directory will be rendered (recursively). if not specified, current directory will be target.")
+	argOutDir := flag.String("o", "", "output directory. if not specified, output html file will be located in the same directory as input markdown file.")
+	argImageInline := flag.Bool("i", false, "whether image files are embeded into html file. default: false.")
+	argWatch := flag.Bool("w", false, "watch modification of markdown files and refresh html file as modification. default: false.")
+	argCustomTemplate := flag.String("t", "", "custom html template file path.")
+	argCustomStyle := flag.String("s", "", "custom stylesheet path")
 	flag.Parse()
 
 	log.Println("preparing...")
