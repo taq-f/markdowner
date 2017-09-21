@@ -1,8 +1,8 @@
 package style
 
 import (
-	"fmt"
 	"io/ioutil"
+	"log"
 	"strings"
 )
 
@@ -167,7 +167,7 @@ func Get(custom *[]string) string {
 	for _, path := range *custom {
 		content, err := ioutil.ReadFile(path)
 		if err != nil {
-			fmt.Println("WARNING: style sheet read error: ", err)
+			log.Println("WARNING: style sheet read error: ", err)
 			continue
 		}
 
