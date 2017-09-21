@@ -10,6 +10,7 @@ import (
 
 	"github.com/go-fsnotify/fsnotify"
 	zglob "github.com/mattn/go-zglob"
+	"github.com/pkg/errors"
 	"github.com/taq-f/markdowner/renderer"
 	"github.com/taq-f/markdowner/style"
 	"github.com/taq-f/markdowner/template"
@@ -200,7 +201,7 @@ func getTargetFiles(path string) ([]string, error) {
 	globStr := filepath.Join(path, "**", "*.md")
 	files, err := zglob.Glob(globStr)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get all md files under %s", path)
 	}
 
 	return files, nil

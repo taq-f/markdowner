@@ -14,6 +14,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/pkg/errors"
 	"github.com/russross/blackfriday"
 	"github.com/sourcegraph/syntaxhighlight"
 )
@@ -36,7 +37,7 @@ type Renderer struct {
 func (r *Renderer) Render(path string) error {
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to read %s", path)
 	}
 
 	markdowned := blackfriday.MarkdownCommon(data)
@@ -45,14 +46,14 @@ func (r *Renderer) Render(path string) error {
 
 	err = os.MkdirAll(filepath.Dir(outPath), os.ModeDir)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to create %s", filepath.Dir(outPath))
 	}
 
 	// we need document reader to modify markdowned html text, for example,
 	// syntax highlight.
 	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(markdowned))
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to parse markdown contents of %s", path)
 	}
 	r.highlightCode(doc)
 	r.handleImage(doc, filepath.Dir(path))
@@ -67,7 +68,7 @@ func (r *Renderer) Render(path string) error {
 
 	err = ioutil.WriteFile(outPath, []byte(output), os.ModeAppend)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to write %s", outPath)
 	}
 
 	return nil
@@ -114,12 +115,12 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 			toPath := filepath.Join(r.OutDir, dirPath[utf8.RuneCountInString(r.BaseDir):], src)
 			err := os.MkdirAll(filepath.Dir(toPath), os.ModeDir)
 			if err != nil {
-				log.Println("failed to create a directory for assets", err)
+				log.Println("WARNING: failed to create a directory for assets", err)
 				return
 			}
 			err = copyFile(fromPath, toPath)
 			if err != nil {
-				log.Println("failed to copy assets", err)
+				log.Println("WARNING: failed to copy assets", err)
 				return
 			}
 		})
