@@ -32,21 +32,20 @@ type Renderer struct {
 	OutDir string
 }
 
-// Render converts markdown to html and write it to file
+// Render converts markdown to html and write it to file.
 func (r *Renderer) Render(path string) error {
+	outPath := outPath(path, r.OutDir, r.BaseDir)
+
+	if err := os.MkdirAll(filepath.Dir(outPath), os.ModeDir); err != nil {
+		return errors.Wrapf(err, "failed to create %s", filepath.Dir(outPath))
+	}
+
 	data, err := ioutil.ReadFile(path)
 	if err != nil {
 		return errors.Wrapf(err, "failed to read %s", path)
 	}
 
 	markdowned := blackfriday.MarkdownCommon(data)
-
-	outPath := outPath(path, r.OutDir, r.BaseDir)
-
-	err = os.MkdirAll(filepath.Dir(outPath), os.ModeDir)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create %s", filepath.Dir(outPath))
-	}
 
 	// we need document reader to modify markdowned html text, for example,
 	// syntax highlight.
