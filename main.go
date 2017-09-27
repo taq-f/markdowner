@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"github.com/go-fsnotify/fsnotify"
 	zglob "github.com/mattn/go-zglob"
 	"github.com/pkg/errors"
+	exists "github.com/taq-f/go-exists"
 	"github.com/taq-f/markdowner/renderer"
 	"github.com/taq-f/markdowner/style"
 	"github.com/taq-f/markdowner/template"
@@ -28,52 +30,14 @@ func main() {
 
 	log.Println("INFO : preparing...")
 
-	// input file / directory
-	// if not specified, current directory
-	var input string
-	if *argInputFile == "" {
-		input, _ = filepath.Abs(filepath.Dir(os.Args[0]))
-		log.Println("INFO : input file/directory not specified. current directory will be input directory:", input)
-	} else {
-		input = cleanPathStr(*argInputFile)
-		log.Println("INFO : input file/directory set:", input)
+	// paths
+	inputPath, basePath, outPath, err := getPath(*argInputFile, *argOutDir)
+
+	if err != nil {
+		log.Fatalf("ERROR: %v", err)
 	}
 
-	// base directory of input
-	var baseDir string
-	if *argInputFile == "" {
-		baseDir = input
-	} else {
-		if isDir(input) {
-			baseDir = input
-		} else {
-			baseDir = filepath.Dir(input)
-		}
-	}
-
-	// output directory
-	// if not specified, same as input directory
-	var outDir string
-	if *argOutDir == "" {
-		if isDir(input) {
-			outDir = input
-		} else {
-			outDir = filepath.Dir(input)
-		}
-		log.Println("INFO : output directory is not speficied. same as input:", outDir)
-	} else {
-		outDir = cleanPathStr(*argOutDir)
-
-		log.Println("INFO : output directory:", outDir)
-		log.Println("INFO : cleaning output directory")
-		err := os.RemoveAll(outDir)
-		if err != nil {
-			log.Fatalln("ERROR: failed to clear output directory")
-		}
-		log.Println("INFO : cleaning successfully completed")
-	}
-
-	// custom styles
+	// custom template
 	customTemplate := *argCustomTemplate
 
 	// custom styles
@@ -88,10 +52,11 @@ func main() {
 		ImageInline: *argImageInline,
 		Template:    template.Get(customTemplate),
 		Style:       style.Get(&customStyles),
-		OutDir:      outDir,
-		BaseDir:     baseDir}
+		OutDir:      outPath,
+		BaseDir:     basePath,
+	}
 
-	files, err := getTargetFiles(input)
+	files, err := getTargetFiles(inputPath)
 	if err != nil {
 		log.Fatalln("ERROR: failed to find target files:", err)
 	}
@@ -122,7 +87,7 @@ func main() {
 
 	if *argWatch {
 		log.Println("INFO : start watching...")
-		watch(input, &r)
+		watch(inputPath, &r)
 	}
 }
 
@@ -208,6 +173,10 @@ func watch(root string, renderer *renderer.Renderer) {
 // if the path is a file, return only that file.
 // if the path is a directory, return all markdown files under it (recursively).
 func getTargetFiles(path string) ([]string, error) {
+	if !exists.File(path) {
+		return nil, errors.New("file not found")
+	}
+
 	if !isDir(path) {
 		return []string{path}, nil
 	}
@@ -248,15 +217,63 @@ func isDir(path string) bool {
 	return mode.IsDir()
 }
 
-// cleanse path string, for example, "some/path/" -> "some/path"
-func cleanPathStr(path string) string {
-	return filepath.Join(path)
-}
-
 // see if specified path is markdown file
 func isTargetFile(path string) bool {
 	if isDir(path) {
 		return false
 	}
 	return filepath.Ext(path) == ".md"
+}
+
+// get directory paths
+func getPath(input, output string) (inputPath, basePath, outPath string, err error) {
+	// input path and base path
+	if input == "" {
+		// current directory if not specified
+		// inputPath, _ = filepath.Abs(filepath.Dir(os.Args[0]))
+		curPath, e := os.Getwd()
+		if e != nil {
+			err = e
+			return
+		}
+		inputPath, e = filepath.Abs(curPath)
+		if e != nil {
+			err = e
+			return
+		}
+		basePath = inputPath
+	} else {
+		// always handle path as absolute path
+		i, e := filepath.Abs(input)
+		if e != nil {
+			err = e
+			return
+		}
+		inputPath = i
+
+		// input path must exist
+		if !exists.File(inputPath) {
+			err = fmt.Errorf("input path does not exists: %v", inputPath)
+			return
+		}
+
+		if isDir(inputPath) {
+			basePath = inputPath
+		} else {
+			basePath = filepath.Dir(inputPath)
+		}
+	}
+
+	if output == "" {
+		// same as input
+		if isDir(inputPath) {
+			outPath = inputPath
+		} else {
+			outPath = filepath.Dir(inputPath)
+		}
+	} else {
+		outPath, _ = filepath.Abs(output)
+	}
+
+	return
 }
