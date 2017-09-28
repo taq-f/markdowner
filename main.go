@@ -30,6 +30,13 @@ func main() {
 
 	log.Println("INFO : preparing...")
 
+	// input file can also be specified without flag. command line arg without
+	// flag is primary
+	args := flag.Args()
+	if len(args) >= 1 {
+		argInputFile = &args[0]
+	}
+
 	// paths
 	inputPath, basePath, outPath, err := getPath(*argInputFile, *argOutDir)
 
