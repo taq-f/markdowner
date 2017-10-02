@@ -14,9 +14,9 @@ import (
 	zglob "github.com/mattn/go-zglob"
 	"github.com/pkg/errors"
 	exists "github.com/taq-f/go-exists"
-	"github.com/taq-f/markdowner/renderer"
-	"github.com/taq-f/markdowner/style"
-	"github.com/taq-f/markdowner/template"
+	"github.com/taq-f/miniature-potato/renderer"
+	"github.com/taq-f/miniature-potato/style"
+	"github.com/taq-f/miniature-potato/template"
 )
 
 func main() {
