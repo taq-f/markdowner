@@ -92,11 +92,11 @@ func main() {
 	log.Printf("INFO : %d files detected", len(files))
 
 	wait := new(sync.WaitGroup)
-	wait.Add(len(files))
 
 	var failed []string
 
 	for _, f := range files {
+		wait.Add(1)
 		go func(file string) {
 			err = r.Render(file)
 			if err == nil {
