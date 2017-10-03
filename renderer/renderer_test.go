@@ -1,10 +1,13 @@
 package renderer
 
 import (
+	"bytes"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/PuerkitoBio/goquery"
 )
 
 func TestRender(t *testing.T) {
@@ -20,7 +23,6 @@ func TestRender(t *testing.T) {
 			t.Fatalf("failed to remove output file before Render test: %v", err)
 		}
 	}
-
 	r := Renderer{
 		ImageInline: false,
 		Template:    "<html>\n<body>\n{{{content}}}\n</body>\n</html>",
@@ -44,6 +46,53 @@ func TestRender(t *testing.T) {
 
 	// Exported html content won't be validated here since a depended library
 	// convert markdown content to html.
+}
+
+func TestRenderImageInline(t *testing.T) {
+	curPath, _ := os.Getwd()
+	mdPath := filepath.Join(curPath, "..", "test_assets", "sample.md")
+	basePath := filepath.Join(curPath, "..", "test_assets")
+	outDir := filepath.Join(curPath, "..", "test_assets")
+	outFilePath := filepath.Join(outDir, "sample.html")
+
+	// cleaning up the output file
+	if _, err := os.Stat(outFilePath); err == nil {
+		if err := os.Remove(outFilePath); err != nil {
+			t.Fatalf("failed to remove output file before Render test: %v", err)
+		}
+	}
+
+	r := Renderer{
+		ImageInline: true,
+		Template:    "<html>\n<body>\n{{{content}}}\n</body>\n</html>",
+		BaseDir:     basePath,
+		OutDir:      outDir,
+	}
+
+	if err := r.Render(mdPath); err != nil {
+		t.Fatalf("Render unexpectedly gave an error: %v", err)
+	}
+
+	content, err := ioutil.ReadFile(outFilePath)
+	if err != nil {
+		t.Fatalf("Render did not seem to write html file. Failed to read the output file after Renderer reports success.: %v", err)
+	}
+
+	// find img tag whose source should be base64 encoded image data
+	doc, err := goquery.NewDocumentFromReader(bytes.NewReader(content))
+	if err != nil {
+		t.Fatalf("could not parse output content into HTML: %v", err)
+	}
+
+	imageBase64, _ := ioutil.ReadFile(filepath.Join(basePath, "image", "base64_company.txt"))
+	srcStr := "data:image/png;base64," + string(imageBase64)
+
+	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		src, _ := s.Attr("src")
+		if src != srcStr {
+			t.Error("embeded image tag does not seem to be generated correctly")
+		}
+	})
 }
 
 func TestOutPath(t *testing.T) {
