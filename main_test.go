@@ -94,3 +94,24 @@ func TestGetPathFail(t *testing.T) {
 		t.Error("getPath unexpectedly did not throw error while input directory does not exist.")
 	}
 }
+
+func TestIsDirTrue(t *testing.T) {
+	curPath, _ := os.Getwd()
+	testDirPath := filepath.Join(curPath, "test_assets")
+	if !isDir(testDirPath) {
+		t.Errorf("isDir returned false while the directory exists: %v", testDirPath)
+	}
+}
+
+func TestIsDirFalse(t *testing.T) {
+	curPath, _ := os.Getwd()
+	testDirPath := filepath.Join(curPath, "test_assets", "path_not_exists")
+	if isDir(testDirPath) {
+		t.Errorf("isDir returned true while the directory does not exist: %v", testDirPath)
+	}
+
+	testDirPath = filepath.Join(curPath, "test_assets", "sample.html")
+	if isDir(testDirPath) {
+		t.Errorf("isDir returned true while the path points to a file: %v", testDirPath)
+	}
+}
