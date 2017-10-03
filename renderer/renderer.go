@@ -126,13 +126,13 @@ func (r *Renderer) handleImage(doc *goquery.Document, dirPath string) {
 }
 
 // get output file name
-func outPath(input string, outDir string, baseDir string) string {
+func outPath(input, outDir, baseDir string) string {
 	out := filepath.Join(outDir, input[len(baseDir):])
 	return changeExtension(out, "html")
 }
 
 // change extension
-func changeExtension(path string, toExt string) string {
+func changeExtension(path, toExt string) string {
 	return dropExtension(path) + "." + toExt
 }
 
@@ -160,7 +160,7 @@ func imageToBase64(path string) (string, error) {
 }
 
 // copy file
-func copyFile(srcPath string, destPath string) error {
+func copyFile(srcPath, destPath string) error {
 	if srcPath == destPath {
 		return nil
 	}
