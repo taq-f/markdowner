@@ -3,10 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -15,8 +15,6 @@ import (
 	"github.com/pkg/errors"
 	exists "github.com/taq-f/go-exists"
 	"github.com/taq-f/miniature-potato/renderer"
-	"github.com/taq-f/miniature-potato/style"
-	"github.com/taq-f/miniature-potato/template"
 )
 
 func main() {
@@ -45,20 +43,42 @@ func main() {
 	}
 
 	// custom template
-	customTemplate := *argCustomTemplate
+	template := ""
+	if *argCustomTemplate != "" {
+		content, err := ioutil.ReadFile(*argCustomTemplate)
+		if err != nil {
+			log.Println("WARN : failed to read template. default template will be used:", err)
+			content, _ = Asset("assets/template.html")
+			template = string(content)
+		} else {
+			template = string(content)
+		}
+	} else {
+		content, _ := Asset("assets/template.html")
+		template = string(content)
+	}
 
 	// custom styles
-	var customStyles []string
-	if *argCustomStyle == "" {
-		customStyles = []string{}
+	style := ""
+	if *argCustomStyle != "" {
+		content, err := ioutil.ReadFile(*argCustomStyle)
+		if err != nil {
+			log.Println("WARN : failed to read stylesheet. default style will be used:", err)
+			content, _ = Asset("assets/default.css")
+			style = string(content)
+		} else {
+			style = string(content)
+		}
 	} else {
-		customStyles = strings.Split(*argCustomStyle, " ")
+		content, _ := Asset("assets/default.css")
+		style = string(content)
 	}
+	style = "\n<style>\n" + style + "\n</style>\n"
 
 	r := renderer.Renderer{
 		ImageInline: *argImageInline,
-		Template:    template.Get(customTemplate),
-		Style:       style.Get(&customStyles),
+		Template:    template,
+		Style:       style,
 		OutDir:      outPath,
 		BaseDir:     basePath,
 	}

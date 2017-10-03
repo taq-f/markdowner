@@ -15,5 +15,7 @@
 
 # debug file by VSCode
 /debug
-
 /.vscode
+
+# output of go-bindata
+/bindata.go
