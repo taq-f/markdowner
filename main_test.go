@@ -25,7 +25,6 @@ func TestGetPathSuccess(t *testing.T) {
 	if err != nil {
 		t.Fatal("failed to create sample.md. can't continue.")
 	}
-	defer file.Close()
 
 	testCases := []TestCase{
 		TestCase{
@@ -82,8 +81,9 @@ func TestGetPathSuccess(t *testing.T) {
 		}
 	}
 
+	file.Close()
 	if err := os.RemoveAll(sampleDir); err != nil {
-		t.Fatalf("failed to remove sample directory")
+		t.Fatalf("failed to remove sample directory: %v", err)
 	}
 }
 
