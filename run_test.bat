@@ -1,0 +1,3 @@
+@echo off
+
+go test github.com/taq-f/miniature-potato/...
