@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"flag"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -18,15 +20,15 @@ import (
 )
 
 func main() {
-	argInputFile := flag.String("f", "", "input file/directory. if directory is specified, all markdown files under the directory will be rendered (recursively). if not specified, current directory will be target.")
-	argOutDir := flag.String("o", "", "output directory. if not specified, output html file will be located in the same directory as input markdown file.")
-	argImageInline := flag.Bool("i", false, "whether image files are embeded into html file. default: false.")
-	argWatch := flag.Bool("w", false, "watch modification of markdown files and refresh html file as modification. default: false.")
+	crr, _ := os.Getwd()
+
+	argInputFile := flag.String("f", crr, "Input file/directory. If directory is specified, all markdown files under the directory will be rendered recursively. If not specified, current directory.")
+	argOutDir := flag.String("o", "", "Output directory. If not specified, html file will be located in the same directory as the markdown file.")
+	argImageInline := flag.Bool("i", false, "Whether image files are embeded into html file. default: false.")
+	argWatch := flag.Bool("w", false, "Watch modification of markdown files and refresh html file as modification. default: false.")
 	argCustomTemplate := flag.String("t", "", "custom html template file path.")
 	argCustomStyle := flag.String("s", "", "custom stylesheet path")
 	flag.Parse()
-
-	log.Println("INFO : preparing...")
 
 	// input file can also be specified without flag. command line arg without
 	// flag is primary
@@ -35,45 +37,19 @@ func main() {
 		argInputFile = &args[0]
 	}
 
-	// paths
-	inputPath, basePath, outPath, err := getPath(*argInputFile, *argOutDir)
+	// after here, all paths should be considered as absolute path.
+	inputPath, basePath, outPath, err := parsePath(*argInputFile, *argOutDir)
 
 	if err != nil {
+		// input, output and base paths are all required.
+		// so no further processing with some error aquiring paths.
 		log.Fatalf("ERROR: %v", err)
 	}
 
-	// custom template
-	template := ""
-	if *argCustomTemplate != "" {
-		content, err := ioutil.ReadFile(*argCustomTemplate)
-		if err != nil {
-			log.Println("WARN : failed to read template. default template will be used:", err)
-			content, _ = Asset("assets/template.html")
-			template = string(content)
-		} else {
-			template = string(content)
-		}
-	} else {
-		content, _ := Asset("assets/template.html")
-		template = string(content)
-	}
+	log.Println("INFO : initializing...")
 
-	// custom styles
-	style := ""
-	if *argCustomStyle != "" {
-		content, err := ioutil.ReadFile(*argCustomStyle)
-		if err != nil {
-			log.Println("WARN : failed to read stylesheet. default style will be used:", err)
-			content, _ = Asset("assets/default.css")
-			style = string(content)
-		} else {
-			style = string(content)
-		}
-	} else {
-		content, _ := Asset("assets/default.css")
-		style = string(content)
-	}
-	style = "\n<style>\n" + style + "\n</style>\n"
+	style := getStyleTag(*argCustomStyle)
+	template := getTemplate(*argCustomTemplate)
 
 	r := renderer.Renderer{
 		ImageInline: *argImageInline,
@@ -100,9 +76,9 @@ func main() {
 		go func(file string) {
 			err = r.Render(file)
 			if err == nil {
-				log.Printf("INFO : done: %s", file)
+				log.Printf("INFO : written: %s", file)
 			} else {
-				log.Printf("INFO : fail: %s: %s", file, err)
+				log.Printf("INFO : fail   : %s: %s", file, err)
 				failed = append(failed, file)
 			}
 			wait.Done()
@@ -253,12 +229,26 @@ func isTargetFile(path string) bool {
 }
 
 // get directory paths
-func getPath(input, output string) (inputPath, basePath, outPath string, err error) {
+//
+// takes
+//
+// * input path, which could be empty (current directory), relative path (from current directory),
+//               or absolute path.
+// * output path, which could be empty (current directory), relative path (from current directory),
+//                or absolute path.
+//
+// and returns
+//
+// * input path, which is converted to absolute path.
+// * base path,
+// * output path, which is converted to absolute path.
+//
+func parsePath(input, output string) (inputPath, basePath, outPath string, err error) {
 	// input path and base path
 	if input == "" {
 		// current directory if not specified
-		// inputPath, _ = filepath.Abs(filepath.Dir(os.Args[0]))
 		curPath, e := os.Getwd()
+
 		if e != nil {
 			err = e
 			return
@@ -268,6 +258,7 @@ func getPath(input, output string) (inputPath, basePath, outPath string, err err
 			err = e
 			return
 		}
+		// base path should be the same as input path if input path is not specified.
 		basePath = inputPath
 	} else {
 		// always handle path as absolute path
@@ -299,8 +290,60 @@ func getPath(input, output string) (inputPath, basePath, outPath string, err err
 			outPath = filepath.Dir(inputPath)
 		}
 	} else {
-		outPath, _ = filepath.Abs(output)
+		o, e := filepath.Abs(output)
+
+		if e != nil {
+			err = e
+			return
+		}
+
+		outPath = o
 	}
 
 	return
+}
+
+// create html template string
+func getTemplate(custom string) string {
+	if custom != "" {
+		content, err := ioutil.ReadFile(custom)
+		if err != nil {
+			// user specified css file must exist.
+			log.Fatalf("ERROR: %v", err)
+		}
+		return string(content)
+	}
+
+	return readAssets("/assets/template.html")
+}
+
+// create style tag string
+func getStyleTag(custom string) string {
+	style := ""
+
+	if custom != "" {
+		content, err := ioutil.ReadFile(custom)
+		if err != nil {
+			// user specified css file must exist.
+			log.Fatalf("ERROR: %v", err)
+		}
+		style = string(content)
+	} else {
+		style = readAssets("/assets/default.css")
+	}
+
+	return "\n<style>\n" + style + "\n</style>\n"
+}
+
+// read assets
+func readAssets(path string) (content string) {
+	file, err := Assets.Open(path)
+	if err != nil {
+		// assets must exist since they are not something user freely specifies.
+		log.Fatalf("ERROR: %v", err)
+	}
+	by := new(bytes.Buffer)
+	io.Copy(by, file)
+
+	return string(by.Bytes())
 }

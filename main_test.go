@@ -6,7 +6,7 @@ import (
 	"testing"
 )
 
-func TestGetPathSuccess(t *testing.T) {
+func TestParsePathSuccess(t *testing.T) {
 
 	type TestCase struct {
 		input             string
@@ -65,7 +65,7 @@ func TestGetPathSuccess(t *testing.T) {
 	}
 
 	for i, testCase := range testCases {
-		inputPath, basePath, outPath, err := getPath(testCase.input, testCase.output)
+		inputPath, basePath, outPath, err := parsePath(testCase.input, testCase.output)
 
 		if inputPath != testCase.expectedInputPath {
 			t.Errorf("\n%d input path error\ngot %v\nwant %v", i, inputPath, testCase.expectedInputPath)
@@ -87,9 +87,9 @@ func TestGetPathSuccess(t *testing.T) {
 	}
 }
 
-func TestGetPathFail(t *testing.T) {
+func TestParsePathFail(t *testing.T) {
 	// input dir not found
-	_, _, _, err := getPath("shouldnotexists", "")
+	_, _, _, err := parsePath("shouldnotexists", "")
 	if err == nil {
 		t.Error("getPath unexpectedly did not throw error while input directory does not exist.")
 	}

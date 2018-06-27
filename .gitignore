@@ -17,5 +17,5 @@
 /debug
 /.vscode
 
-# output of go-bindata
-/bindata.go
+# output of go-asset
+/assets.go
