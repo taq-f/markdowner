@@ -19,37 +19,80 @@ import (
 	"github.com/taq-f/miniature-potato/renderer"
 )
 
-func main() {
-	crr, _ := os.Getwd()
+var debugLog *log.Logger
+var infoLog *log.Logger
+var warnLog *log.Logger
+var errLog *log.Logger
 
-	argInputFile := flag.String("f", crr, "Input file/directory. If directory is specified, all markdown files under the directory will be rendered recursively. If not specified, current directory.")
+func initLogger(verbose bool) {
+	if !verbose {
+		debugLog = log.New(ioutil.Discard, "[DEBUG] ", log.Ldate|log.Ltime)
+	} else {
+		debugLog = log.New(os.Stdout, "[DEBUG] ", log.Ldate|log.Ltime)
+	}
+	infoLog = log.New(os.Stdout, "[INFO]  ", log.Ldate|log.Ltime)
+	warnLog = log.New(os.Stdout, "[WARN]  ", log.Ldate|log.Ltime)
+	errLog = log.New(os.Stdout, "[ERRRR] ", log.Ldate|log.Ltime)
+}
+
+func main() {
 	argOutDir := flag.String("o", "", "Output directory. If not specified, html file will be located in the same directory as the markdown file.")
 	argImageInline := flag.Bool("i", false, "Whether image files are embeded into html file. default: false.")
-	argWatch := flag.Bool("w", false, "Watch modification of markdown files and refresh html file as modification. default: false.")
 	argCustomTemplate := flag.String("t", "", "custom html template file path.")
 	argCustomStyle := flag.String("s", "", "custom stylesheet path")
+	argVerbose := flag.Bool("v", false, "Show details about processing. default false.")
+	argWatch := flag.Bool("w", false, "Watch modification of markdown files and refresh html file as modification. default: false.")
+
 	flag.Parse()
 
-	// input file can also be specified without flag. command line arg without
-	// flag is primary
+	initLogger(*argVerbose)
+
+	debugLog.Printf("option: out: %s", *argOutDir)
+	debugLog.Printf("option: image inline: %v", *argImageInline)
+	debugLog.Printf("option: template: %v", *argCustomTemplate)
+	debugLog.Printf("option: style sheet: %v", *argCustomStyle)
+	debugLog.Printf("option: watch: %v", *argWatch)
+
+	// input path is specified without flag (as command line arg).
+	argInputPath := ""
 	args := flag.Args()
 	if len(args) >= 1 {
-		argInputFile = &args[0]
+		argInputPath = args[0]
+		debugLog.Printf("input path specified: %v", argInputPath)
+	} else {
+		crr, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("ERROR: %v", err)
+		}
+		argInputPath = crr
+		debugLog.Printf("input path not specified. current directory is selected: %v", argInputPath)
 	}
 
 	// after here, all paths should be considered as absolute path.
-	inputPath, basePath, outPath, err := parsePath(*argInputFile, *argOutDir)
+	inputPath, basePath, outPath, err := parsePath(argInputPath, *argOutDir)
 
 	if err != nil {
 		// input, output and base paths are all required.
 		// so no further processing with some error aquiring paths.
-		log.Fatalf("ERROR: %v", err)
+		errLog.Fatal(err)
 	}
 
-	log.Println("INFO : initializing...")
+	debugLog.Printf("normalized path: input: %v", inputPath)
+	debugLog.Printf("normalized path: base:  %v", basePath)
+	debugLog.Printf("normalized path: out:   %v", outPath)
 
 	style := getStyleTag(*argCustomStyle)
 	template := getTemplate(*argCustomTemplate)
+
+	debugLog.Print("style tag aquired")
+	debugLog.Print("template html aquired")
+
+	files, err := getTargetFiles(inputPath)
+	if err != nil {
+		errLog.Fatal("failed to find target files:", err)
+	}
+
+	infoLog.Printf("%d files detected", len(files))
 
 	r := renderer.Renderer{
 		ImageInline: *argImageInline,
@@ -59,13 +102,7 @@ func main() {
 		BaseDir:     basePath,
 	}
 
-	files, err := getTargetFiles(inputPath)
-	if err != nil {
-		log.Fatalln("ERROR: failed to find target files:", err)
-	}
-
-	log.Println("INFO : initialization completed")
-	log.Printf("INFO : %d files detected", len(files))
+	debugLog.Print("renderer initialized")
 
 	wait := new(sync.WaitGroup)
 
@@ -73,12 +110,13 @@ func main() {
 
 	for _, f := range files {
 		wait.Add(1)
+		debugLog.Printf("render job added for %v", f)
 		go func(file string) {
 			err = r.Render(file)
 			if err == nil {
-				log.Printf("INFO : written: %s", file)
+				infoLog.Printf("written: %s", file)
 			} else {
-				log.Printf("INFO : fail   : %s: %s", file, err)
+				warnLog.Printf("fail   : %s: %s", file, err)
 				failed = append(failed, file)
 			}
 			wait.Done()
@@ -86,10 +124,10 @@ func main() {
 	}
 	wait.Wait()
 
-	log.Printf("INFO : SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
+	infoLog.Printf("SUMMARY: all %d, success %d, fail %d", len(files), len(files)-len(failed), len(failed))
 
 	if *argWatch {
-		log.Println("INFO : start watching...")
+		infoLog.Println("start watching...")
 		watch(inputPath, &r)
 	}
 }
@@ -98,7 +136,7 @@ func main() {
 func watch(root string, renderer *renderer.Renderer) {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		log.Fatal(err)
+		errLog.Fatal(err)
 	}
 	defer watcher.Close()
 
@@ -132,16 +170,16 @@ func watch(root string, renderer *renderer.Renderer) {
 						}
 
 						if doRender {
-							log.Println("INFO : modification detected:", path)
+							infoLog.Println("modification detected:", path)
 							renderer.Render(path)
 						}
 					}
 				case event.Op&fsnotify.Create == fsnotify.Create:
 					if isTargetFile(path) {
-						log.Println("INFO : new file detected:", path)
+						infoLog.Println("new file detected:", path)
 						renderer.Render(path)
 					} else if isDir(path) {
-						log.Println("INFO : new directory detected:", path)
+						infoLog.Println("new directory detected:", path)
 						watcher.Add(path)
 					}
 				case event.Op&fsnotify.Remove == fsnotify.Remove:
@@ -156,7 +194,7 @@ func watch(root string, renderer *renderer.Renderer) {
 					// TODO
 				}
 			case err := <-watcher.Errors:
-				log.Println("ERROR: watch error: ", err)
+				errLog.Println("watch error: ", err)
 				done <- true
 			}
 		}
@@ -165,7 +203,7 @@ func watch(root string, renderer *renderer.Renderer) {
 	for _, p := range getDirectories(root) {
 		err = watcher.Add(p)
 		if err != nil {
-			log.Fatal(err)
+			errLog.Fatal(err)
 		}
 	}
 
@@ -309,7 +347,7 @@ func getTemplate(custom string) string {
 		content, err := ioutil.ReadFile(custom)
 		if err != nil {
 			// user specified css file must exist.
-			log.Fatalf("ERROR: %v", err)
+			errLog.Fatalf("could not open template: %s: %v", custom, err)
 		}
 		return string(content)
 	}
@@ -325,7 +363,7 @@ func getStyleTag(custom string) string {
 		content, err := ioutil.ReadFile(custom)
 		if err != nil {
 			// user specified css file must exist.
-			log.Fatalf("ERROR: %v", err)
+			errLog.Fatalf("could not open style sheet: %s: %v", custom, err)
 		}
 		style = string(content)
 	} else {
@@ -340,7 +378,7 @@ func readAssets(path string) (content string) {
 	file, err := Assets.Open(path)
 	if err != nil {
 		// assets must exist since they are not something user freely specifies.
-		log.Fatalf("ERROR: %v", err)
+		errLog.Fatalf("failed to read asset: %s: %v", path, err)
 	}
 	by := new(bytes.Buffer)
 	io.Copy(by, file)
