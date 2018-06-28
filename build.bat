@@ -1,4 +1,4 @@
 @echo off
 
-go-bindata assets
+go-assets-builder -o assets.go assets
 go install
